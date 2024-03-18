@@ -9,26 +9,23 @@
 #define MSCKF_VIO_UTILS_H
 
 #include <ros/ros.h>
-#include <string>
-#include <opencv2/core/core.hpp>
+
 #include <Eigen/Geometry>
+#include <opencv2/core/core.hpp>
+#include <string>
 
 namespace msckf_vio {
 /*
  * @brief utilities for msckf_vio
  */
 namespace utils {
-Eigen::Isometry3d getTransformEigen(const ros::NodeHandle &nh,
-                                    const std::string &field);
+Eigen::Isometry3d getTransformEigen(const ros::NodeHandle& nh, const std::string& field);
 
-cv::Mat getTransformCV(const ros::NodeHandle &nh,
-                       const std::string &field);
+cv::Mat getTransformCV(const ros::NodeHandle& nh, const std::string& field);
 
-cv::Mat getVec16Transform(const ros::NodeHandle &nh,
-                          const std::string &field);
+cv::Mat getVec16Transform(const ros::NodeHandle& nh, const std::string& field);
 
-cv::Mat getKalibrStyleTransform(const ros::NodeHandle &nh,
-                                const std::string &field);
-}
-}
+cv::Mat getKalibrStyleTransform(const ros::NodeHandle& nh, const std::string& field);
+}  // namespace utils
+}  // namespace msckf_vio
 #endif

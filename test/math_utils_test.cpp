@@ -5,9 +5,10 @@
  * All rights reserved.
  */
 
-#include <iostream>
-#include <Eigen/Dense>
 #include <gtest/gtest.h>
+
+#include <Eigen/Dense>
+#include <iostream>
 #include <msckf_vio/math_utils.hpp>
 
 using namespace std;

@@ -79,6 +79,9 @@ include_directories(
   ${SUITESPARSE_INCLUDE_DIRS}
 )
 
+#@note 为了让编辑器识别到.h文件,没有实际用处
+include_directories(${PROJECT_SOURCE_DIR}/../../devel/include/)
+
 # Msckf Vio
 add_library(msckf_vio
   src/msckf_vio.cpp
