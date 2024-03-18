@@ -51,46 +51,41 @@ map<int, double> MsckfVio::chi_squared_test_table;
 MsckfVio::MsckfVio(ros::NodeHandle& pnh) : is_gravity_set(false), is_first_img(true), nh(pnh) { return; }
 
 bool MsckfVio::loadParameters() {
-  // Frame id
+  /// Frame id
   nh.param<string>("fixed_frame_id", fixed_frame_id, "world");
   nh.param<string>("child_frame_id", child_frame_id, "robot");
+
   nh.param<bool>("publish_tf", publish_tf, true);
   nh.param<double>("frame_rate", frame_rate, 40.0);
-  nh.param<double>("position_std_threshold", position_std_threshold, 8.0);
 
+  nh.param<double>("position_std_threshold", position_std_threshold, 8.0);
   nh.param<double>("rotation_threshold", rotation_threshold, 0.2618);
   nh.param<double>("translation_threshold", translation_threshold, 0.4);
   nh.param<double>("tracking_rate_threshold", tracking_rate_threshold, 0.5);
 
-  // Feature optimization parameters
+  /// 特征优化参数
   nh.param<double>("feature/config/translation_threshold", Feature::optimization_config.translation_threshold, 0.2);
 
-  // Noise related parameters
+  /// 噪声相关的参数
   nh.param<double>("noise/gyro", IMUState::gyro_noise, 0.001);
   nh.param<double>("noise/acc", IMUState::acc_noise, 0.01);
   nh.param<double>("noise/gyro_bias", IMUState::gyro_bias_noise, 0.001);
   nh.param<double>("noise/acc_bias", IMUState::acc_bias_noise, 0.01);
   nh.param<double>("noise/feature", Feature::observation_noise, 0.01);
 
-  // Use variance instead of standard deviation.
+  /// 使用方差而不是标准差
   IMUState::gyro_noise *= IMUState::gyro_noise;
   IMUState::acc_noise *= IMUState::acc_noise;
   IMUState::gyro_bias_noise *= IMUState::gyro_bias_noise;
   IMUState::acc_bias_noise *= IMUState::acc_bias_noise;
   Feature::observation_noise *= Feature::observation_noise;
 
-  // Set the initial IMU state.
-  // The intial orientation and position will be set to the origin
-  // implicitly. But the initial velocity and bias can be
-  // set by parameters.
-  // TODO: is it reasonable to set the initial bias to 0?
+  /// Set the initial IMU state.
   nh.param<double>("initial_state/velocity/x", state_server.imu_state.velocity(0), 0.0);
   nh.param<double>("initial_state/velocity/y", state_server.imu_state.velocity(1), 0.0);
   nh.param<double>("initial_state/velocity/z", state_server.imu_state.velocity(2), 0.0);
 
-  // The initial covariance of orientation and position can be
-  // set to 0. But for velocity, bias and extrinsic parameters,
-  // there should be nontrivial uncertainty.
+  /// 速度和bias存在初始不确定性
   double gyro_bias_cov, acc_bias_cov, velocity_cov;
   nh.param<double>("initial_covariance/velocity", velocity_cov, 0.25);
   nh.param<double>("initial_covariance/gyro_bias", gyro_bias_cov, 1e-4);
@@ -107,7 +102,7 @@ bool MsckfVio::loadParameters() {
   for (int i = 15; i < 18; ++i) state_server.state_cov(i, i) = extrinsic_rotation_cov;
   for (int i = 18; i < 21; ++i) state_server.state_cov(i, i) = extrinsic_translation_cov;
 
-  // Transformation offsets between the frames involved.
+  /// Transformation offsets between the frames involved.
   Isometry3d T_imu_cam0 = utils::getTransformEigen(nh, "cam0/T_cam_imu");
   Isometry3d T_cam0_imu = T_imu_cam0.inverse();
 
@@ -116,7 +111,6 @@ bool MsckfVio::loadParameters() {
   CAMState::T_cam0_cam1 = utils::getTransformEigen(nh, "cam1/T_cn_cnm1");
   IMUState::T_imu_body = utils::getTransformEigen(nh, "T_imu_body").inverse();
 
-  // Maximum number of camera states to be stored
   nh.param<int>("max_cam_state_size", max_cam_state_size, 30);
 
   ROS_INFO("===========================================");
@@ -170,17 +164,16 @@ bool MsckfVio::initialize() {
   if (!loadParameters()) return false;
   ROS_INFO("Finish loading ROS parameters...");
 
-  // Initialize state server
   state_server.continuous_noise_cov = Matrix<double, 12, 12>::Zero();
   state_server.continuous_noise_cov.block<3, 3>(0, 0) = Matrix3d::Identity() * IMUState::gyro_noise;
   state_server.continuous_noise_cov.block<3, 3>(3, 3) = Matrix3d::Identity() * IMUState::gyro_bias_noise;
   state_server.continuous_noise_cov.block<3, 3>(6, 6) = Matrix3d::Identity() * IMUState::acc_noise;
   state_server.continuous_noise_cov.block<3, 3>(9, 9) = Matrix3d::Identity() * IMUState::acc_bias_noise;
 
-  // Initialize the chi squared test table with confidence
-  // level 0.95.
+  /// Initialize the chi squared test table with confidence level 0.95.
   for (int i = 1; i < 100; ++i) {
     boost::math::chi_squared chi_squared_dist(i);
+    /// 计算一系列卡方分布在给定0.05概率下的分位数
     chi_squared_test_table[i] = boost::math::quantile(chi_squared_dist, 0.05);
   }
 
@@ -199,12 +192,9 @@ void MsckfVio::imuCallback(const sensor_msgs::ImuConstPtr& msg) {
 
   if (!is_gravity_set) {
     if (imu_msg_buffer.size() < 200) return;
-    // if (imu_msg_buffer.size() < 10) return;
     initializeGravityAndBias();
     is_gravity_set = true;
   }
-
-  return;
 }
 
 void MsckfVio::initializeGravityAndBias() {
