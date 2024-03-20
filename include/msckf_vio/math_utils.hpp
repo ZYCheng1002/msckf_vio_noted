@@ -13,8 +13,8 @@
 
 namespace msckf_vio {
 
-/*
- *  @brief Create a skew-symmetric matrix from a 3-element vector.
+/**
+ *  @brief 向量的反对称矩阵
  *  @note Performs the operation:
  *  w   ->  [  0 -w3  w2]
  *          [ w3   0 -w1]
@@ -34,8 +34,8 @@ inline Eigen::Matrix3d skewSymmetric(const Eigen::Vector3d& w) {
   return w_hat;
 }
 
-/*
- * @brief Normalize the given quaternion to unit quaternion.
+/**
+ * @brief 四元数进行归一化
  */
 inline void quaternionNormalize(Eigen::Vector4d& q) {
   double norm = q.norm();
@@ -43,8 +43,9 @@ inline void quaternionNormalize(Eigen::Vector4d& q) {
   return;
 }
 
-/*
+/**
  * @brief Perform q1 * q2
+ * @note Shuster四元数表示下的乘法
  */
 inline Eigen::Vector4d quaternionMultiplication(const Eigen::Vector4d& q1, const Eigen::Vector4d& q2) {
   Eigen::Matrix4d L;
@@ -70,14 +71,11 @@ inline Eigen::Vector4d quaternionMultiplication(const Eigen::Vector4d& q1, const
   return q;
 }
 
-/*
- * @brief Convert the vector part of a quaternion to a
- *    full quaternion.
- * @note This function is useful to convert delta quaternion
- *    which is usually a 3x1 vector to a full quaternion.
- *    For more details, check Section 3.2 "Kalman Filter Update" in
- *    "Indirect Kalman Filter for 3D Attitude Estimation:
- *    A Tutorial for quaternion Algebra".
+/**
+ * @brief Convert the vector part of a quaternion to a full quaternion.
+ * @note This function is useful to convert delta quaternion which is usually a 3x1 vector to a full quaternion.
+ * For more details, check Section 3.2 "Kalman Filter Update" in "Indirect Kalman Filter for 3D Attitude Estimation: A
+ * Tutorial for quaternion Algebra".
  */
 inline Eigen::Vector4d smallAngleQuaternion(const Eigen::Vector3d& dtheta) {
   Eigen::Vector3d dq = dtheta / 2.0;
@@ -96,14 +94,11 @@ inline Eigen::Vector4d smallAngleQuaternion(const Eigen::Vector3d& dtheta) {
   return q;
 }
 
-/*
+/**
  * @brief Convert a quaternion to the corresponding rotation matrix
- * @note Pay attention to the convention used. The function follows the
- *    conversion in "Indirect Kalman Filter for 3D Attitude Estimation:
- *    A Tutorial for Quaternion Algebra", Equation (78).
- *
- *    The input quaternion should be in the form
- *      [q1, q2, q3, q4(scalar)]^T
+ * @note Pay attention to the convention used.
+ * The function follows the conversion in "Indirect Kalman Filter for 3D Attitude Estimation:  A Tutorial for Quaternion
+ * Algebra", Equation (78). The input quaternion should be in the form [q1, q2, q3, q4(scalar)]^T
  */
 inline Eigen::Matrix3d quaternionToRotation(const Eigen::Vector4d& q) {
   const Eigen::Vector3d& q_vec = q.block(0, 0, 3, 1);
@@ -115,14 +110,11 @@ inline Eigen::Matrix3d quaternionToRotation(const Eigen::Vector4d& q) {
   return R;
 }
 
-/*
+/**
  * @brief Convert a rotation matrix to a quaternion.
- * @note Pay attention to the convention used. The function follows the
- *    conversion in "Indirect Kalman Filter for 3D Attitude Estimation:
- *    A Tutorial for Quaternion Algebra", Equation (78).
- *
- *    The input quaternion should be in the form
- *      [q1, q2, q3, q4(scalar)]^T
+ * @note Pay attention to the convention used.
+ * The function follows the conversion in "Indirect Kalman Filter for 3D Attitude Estimation: A Tutorial for Quaternion
+ * Algebra", Equation (78). The input quaternion should be in the form [q1, q2, q3, q4(scalar)]^T
  */
 inline Eigen::Vector4d rotationToQuaternion(const Eigen::Matrix3d& R) {
   Eigen::Vector4d score;

@@ -125,6 +125,8 @@ class MsckfVio {
   /// Propogate the state
   void batchImuProcessing(const double& time_bound);
   void processModel(const double& time, const Eigen::Vector3d& m_gyro, const Eigen::Vector3d& m_acc);
+
+  /// 根据角速度和加速度predict pvq
   void predictNewState(const double& dt, const Eigen::Vector3d& gyro, const Eigen::Vector3d& acc);
 
   /// Measurement update

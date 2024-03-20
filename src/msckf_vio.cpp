@@ -184,10 +184,7 @@ bool MsckfVio::initialize() {
 }
 
 void MsckfVio::imuCallback(const sensor_msgs::ImuConstPtr& msg) {
-  // IMU msgs are pushed backed into a buffer instead of
-  // being processed immediately. The IMU msgs are processed
-  // when the next image is available, in which way, we can
-  // easily handle the transfer delay.
+  /// 使用列队处理IMU延迟
   imu_msg_buffer.push_back(*msg);
 
   if (!is_gravity_set) {
@@ -198,7 +195,7 @@ void MsckfVio::imuCallback(const sensor_msgs::ImuConstPtr& msg) {
 }
 
 void MsckfVio::initializeGravityAndBias() {
-  // Initialize gravity and gyro bias.
+  /// 初始化重力和陀螺仪bias.
   Vector3d sum_angular_vel = Vector3d::Zero();
   Vector3d sum_linear_acc = Vector3d::Zero();
 
@@ -214,20 +211,15 @@ void MsckfVio::initializeGravityAndBias() {
   }
 
   state_server.imu_state.gyro_bias = sum_angular_vel / imu_msg_buffer.size();
-  // IMUState::gravity =
-  //   -sum_linear_acc / imu_msg_buffer.size();
-  //  This is the gravity in the IMU frame.
+  ///  This is the gravity in the IMU frame.
   Vector3d gravity_imu = sum_linear_acc / imu_msg_buffer.size();
 
-  // Initialize the initial orientation, so that the estimation
-  // is consistent with the inertial frame.
+  /// 初始化初始方向,使估计与惯性系一致.
   double gravity_norm = gravity_imu.norm();
   IMUState::gravity = Vector3d(0.0, 0.0, -gravity_norm);
 
   Quaterniond q0_i_w = Quaterniond::FromTwoVectors(gravity_imu, -IMUState::gravity);
   state_server.imu_state.orientation = rotationToQuaternion(q0_i_w.toRotationMatrix().transpose());
-
-  return;
 }
 
 bool MsckfVio::resetCallback(std_srvs::Trigger::Request& req, std_srvs::Trigger::Response& res) {
@@ -290,12 +282,10 @@ bool MsckfVio::resetCallback(std_srvs::Trigger::Request& req, std_srvs::Trigger:
 }
 
 void MsckfVio::featureCallback(const CameraMeasurementConstPtr& msg) {
-  // Return if the gravity vector has not been set.
+  /// 重力向量未初始化前,直接返回
   if (!is_gravity_set) return;
 
-  // Start the system if the first image is received.
-  // The frame where the first image is received will be
-  // the origin.
+  /// 如果收到第一个图像,则启动系统.接收到第一个图像的帧将是原点.
   if (is_first_img) {
     is_first_img = false;
     state_server.imu_state.time = msg->header.stamp.toSec();
@@ -305,13 +295,12 @@ void MsckfVio::featureCallback(const CameraMeasurementConstPtr& msg) {
   static int critical_time_cntr = 0;
   double processing_start_time = ros::Time::now().toSec();
 
-  // Propogate the IMU state.
-  // that are received before the image msg.
+  /// 使用img之前的imu数据进行递推
   ros::Time start_time = ros::Time::now();
   batchImuProcessing(msg->header.stamp.toSec());
   double imu_processing_time = (ros::Time::now() - start_time).toSec();
 
-  // Augment the state vector.
+  /// Augment the state vector.
   start_time = ros::Time::now();
   stateAugmentation(msg->header.stamp.toSec());
   double state_augmentation_time = (ros::Time::now() - start_time).toSec();
@@ -422,44 +411,45 @@ void MsckfVio::mocapOdomCallback(const nav_msgs::OdometryConstPtr& msg) {
 }
 
 void MsckfVio::batchImuProcessing(const double& time_bound) {
-  // Counter how many IMU msgs in the buffer are used.
+  /// 统计多少imu msg被使用
   int used_imu_msg_cntr = 0;
 
   for (const auto& imu_msg : imu_msg_buffer) {
     double imu_time = imu_msg.header.stamp.toSec();
+    /// imu数据的时间戳存在回流,跳过
     if (imu_time < state_server.imu_state.time) {
       ++used_imu_msg_cntr;
       continue;
     }
+    /// 处理在图像之前的数据
     if (imu_time > time_bound) break;
 
-    // Convert the msgs.
+    /// 数据转换.
     Vector3d m_gyro, m_acc;
     tf::vectorMsgToEigen(imu_msg.angular_velocity, m_gyro);
     tf::vectorMsgToEigen(imu_msg.linear_acceleration, m_acc);
 
-    // Execute process model.
+    /// predict过程
     processModel(imu_time, m_gyro, m_acc);
     ++used_imu_msg_cntr;
   }
 
-  // Set the state ID for the new IMU state.
+  /// 更新下一帧的imu状态ID
   state_server.imu_state.id = IMUState::next_id++;
 
-  // Remove all used IMU msgs.
+  /// 清除使用过的msg
   imu_msg_buffer.erase(imu_msg_buffer.begin(), imu_msg_buffer.begin() + used_imu_msg_cntr);
-
-  return;
 }
 
 void MsckfVio::processModel(const double& time, const Vector3d& m_gyro, const Vector3d& m_acc) {
-  // Remove the bias from the measured gyro and acceleration
+  /// 去除角速度和加速度的bias
   IMUState& imu_state = state_server.imu_state;
   Vector3d gyro = m_gyro - imu_state.gyro_bias;
   Vector3d acc = m_acc - imu_state.acc_bias;
   double dtime = time - imu_state.time;
 
-  // Compute discrete transition and noise covariance matrix
+  /// 计算运动方程F和噪声G
+  /// 运动模型X_imu = F*X_imu + G_imu
   Matrix<double, 21, 21> F = Matrix<double, 21, 21>::Zero();
   Matrix<double, 21, 12> G = Matrix<double, 21, 12>::Zero();
 
@@ -480,9 +470,10 @@ void MsckfVio::processModel(const double& time, const Vector3d& m_gyro, const Ve
   Matrix<double, 21, 21> Fdt = F * dtime;
   Matrix<double, 21, 21> Fdt_square = Fdt * Fdt;
   Matrix<double, 21, 21> Fdt_cube = Fdt_square * Fdt;
+  /// 泰勒展开
   Matrix<double, 21, 21> Phi = Matrix<double, 21, 21>::Identity() + Fdt + 0.5 * Fdt_square + (1.0 / 6.0) * Fdt_cube;
 
-  // Propogate the state using 4th order Runge-Kutta
+  /// 四阶龙格库塔法进行pvq递推(求解微分方程的解)
   predictNewState(dtime, gyro, acc);
 
   // Modify the transition matrix
@@ -526,10 +517,11 @@ void MsckfVio::processModel(const double& time, const Vector3d& m_gyro, const Ve
 }
 
 void MsckfVio::predictNewState(const double& dt, const Vector3d& gyro, const Vector3d& acc) {
-  // TODO: Will performing the forward integration using
-  //    the inverse of the quaternion give better accuracy?
+  /// 四阶龙格库塔法解微分方程
   double gyro_norm = gyro.norm();
   Matrix4d Omega = Matrix4d::Zero();
+  /// Omega = |-[w]^ w|
+  ///         |-w^T  0|
   Omega.block<3, 3>(0, 0) = -skewSymmetric(gyro);
   Omega.block<3, 1>(0, 3) = gyro;
   Omega.block<1, 3>(3, 0) = -gyro;
@@ -628,8 +620,6 @@ void MsckfVio::stateAugmentation(const double& time) {
   // Fix the covariance to be symmetric
   MatrixXd state_cov_fixed = (state_server.state_cov + state_server.state_cov.transpose()) / 2.0;
   state_server.state_cov = state_cov_fixed;
-
-  return;
 }
 
 void MsckfVio::addFeatureObservations(const CameraMeasurementConstPtr& msg) {
